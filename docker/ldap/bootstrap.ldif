@@ -1,0 +1,75 @@
+dn: ou=users,dc=staygames,dc=local
+objectClass: organizationalUnit
+ou: users
+
+dn: uid=admin,ou=users,dc=staygames,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: admin
+cn: Admin
+sn: Administrator
+givenName: Admin
+mail: admin@staygames.local
+userPassword: admin
+
+dn: uid=alice,ou=users,dc=staygames,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: alice
+cn: Alice Becker
+sn: Becker
+givenName: Alice
+mail: alice@staygames.local
+userPassword: password
+
+dn: uid=bob,ou=users,dc=staygames,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: bob
+cn: Bob Lindner
+sn: Lindner
+givenName: Bob
+mail: bob@staygames.local
+userPassword: password
+
+dn: uid=charlie,ou=users,dc=staygames,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: charlie
+cn: Charlie Novak
+sn: Novak
+givenName: Charlie
+mail: charlie@staygames.local
+userPassword: password
+
+dn: uid=diana,ou=users,dc=staygames,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: diana
+cn: Diana Weber
+sn: Weber
+givenName: Diana
+mail: diana@staygames.local
+userPassword: password
+
+dn: uid=erik,ou=users,dc=staygames,dc=local
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+uid: erik
+cn: Erik Hoffmann
+sn: Hoffmann
+givenName: Erik
+mail: erik@staygames.local
+userPassword: password

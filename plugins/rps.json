@@ -1,0 +1,110 @@
+{
+  "slug": "rps",
+  "name": "Rock Paper Scissors",
+  "version": "1.0.0",
+  "author": "StayGames",
+  "tagline": "Classic hand game: Rock crushes Scissors, Scissors cuts Paper, Paper covers Rock!",
+  "description": "Rock Paper Scissors is a simultaneous hand game where players throw Rock, Paper, or Scissors. Win rounds by beating your opponent's throw until reaching the target score!",
+  "rulesSummary": [
+    "Two or more players simultaneously reveal Rock, Paper, or Scissors.",
+    "Rock beats Scissors (crushes).",
+    "Scissors beats Paper (cuts).",
+    "Paper beats Rock (covers).",
+    "Identical throws result in a tie (no points awarded).",
+    "The first player to reach the winning score wins the match!"
+  ],
+  "minPlayers": 2,
+  "maxPlayers": 8,
+  "supportedModes": [
+    "scorecard",
+    "quick"
+  ],
+  "defaultMode": "scorecard",
+  "scoringDirection": "highest_wins",
+  "gameType": "competitive",
+  "cooperative": false,
+  "themeColor": "amber",
+  "iconName": "dice",
+  "configFields": [
+    {
+      "key": "targetScore",
+      "label": "Winning Score (First to X wins)",
+      "type": "number",
+      "min": 1,
+      "max": 50,
+      "default": 3,
+      "description": "First player to reach this number of round wins takes the match"
+    }
+  ],
+  "roundInputFields": [
+    {
+      "key": "outcome",
+      "label": "Round Result",
+      "type": "radio",
+      "display": "buttons",
+      "options": [
+        {
+          "value": "win",
+          "label": "Decisive Win"
+        },
+        {
+          "value": "tie",
+          "label": "Draw / Tie (No Points)"
+        }
+      ],
+      "default": "win",
+      "description": "Whether this round had a decisive winner or ended in a draw"
+    }
+  ],
+  "scoreboardColumns": [
+    {
+      "key": "roundNumber",
+      "label": "Round",
+      "align": "center",
+      "format": "integer"
+    },
+    {
+      "key": "outcome",
+      "label": "Result",
+      "align": "center",
+      "format": "badge"
+    }
+  ],
+  "charts": [
+    {
+      "key": "scoreHistory",
+      "title": "Score Progression",
+      "type": "line",
+      "dataKey": "scoreHistory",
+      "color": "#f59e0b"
+    }
+  ],
+  "leaderboardColumns": [
+    {
+      "key": "roundsWon",
+      "label": "Rounds Won",
+      "format": "integer",
+      "aggregate": "sum",
+      "statKey": "roundsWon",
+      "tooltip": "Total rounds won across sessions"
+    },
+    {
+      "key": "winRate",
+      "label": "Win Rate",
+      "format": "percent",
+      "aggregate": "ratio_percent",
+      "statKey": "roundsWon",
+      "denominatorStatKey": "roundsPlayed",
+      "tooltip": "Percentage of played rounds won"
+    },
+    {
+      "key": "roundsPlayed",
+      "label": "Rounds Played",
+      "format": "integer",
+      "aggregate": "sum",
+      "statKey": "roundsPlayed",
+      "tooltip": "Total rounds participated in"
+    }
+  ],
+  "codeJs": "module.exports = function(helpers) {\n  return {\n    slug: 'rps',\n    name: 'Rock Paper Scissors',\n    tagline: 'Classic hand game: Rock crushes Scissors, Scissors cuts Paper, Paper covers Rock!',\n    description: 'Rock Paper Scissors is a simultaneous hand game where players throw Rock, Paper, or Scissors. Win rounds by beating your opponent’s throw until reaching the target score!',\n    rulesSummary: [\n      'Two or more players simultaneously reveal Rock, Paper, or Scissors.',\n      'Rock beats Scissors (crushes).',\n      'Scissors beats Paper (cuts).',\n      'Paper beats Rock (covers).',\n      'Identical throws result in a tie (no points awarded).',\n      'The first player to reach the winning score wins the match!'\n    ],\n    gameType: 'competitive',\n    cooperative: false,\n    minPlayers: 2,\n    maxPlayers: 8,\n    supportedModes: ['scorecard', 'quick'],\n    defaultMode: 'scorecard',\n    scoringDirection: 'highest_wins',\n    themeColor: 'amber',\n    iconName: 'dice',\n\n    configFields: [\n      {\n        key: 'targetScore',\n        label: 'Winning Score (First to X wins)',\n        type: 'number',\n        min: 1,\n        max: 50,\n        default: 3,\n        description: 'First player to reach this number of round wins takes the match'\n      }\n    ],\n\n    roundInputFields: [\n      {\n        key: 'outcome',\n        label: 'Round Result',\n        type: 'radio',\n        display: 'buttons',\n        options: [\n          { value: 'win', label: 'Decisive Win' },\n          { value: 'tie', label: 'Draw / Tie (No Points)' }\n        ],\n        default: 'win',\n        description: 'Whether this round had a decisive winner or ended in a draw'\n      }\n    ],\n\n    scoreboardColumns: [\n      { key: 'roundNumber', label: 'Round', align: 'center', format: 'integer' },\n      { key: 'outcome', label: 'Result', align: 'center', format: 'badge' }\n    ],\n\n    charts: [\n      {\n        key: 'scoreHistory',\n        title: 'Score Progression',\n        type: 'line',\n        dataKey: 'scoreHistory',\n        color: '#f59e0b'\n      }\n    ],\n\n    leaderboardColumns: [\n      {\n        key: 'roundsWon',\n        label: 'Rounds Won',\n        format: 'integer',\n        aggregate: 'sum',\n        statKey: 'roundsWon',\n        tooltip: 'Total rounds won across sessions'\n      },\n      {\n        key: 'winRate',\n        label: 'Win Rate',\n        format: 'percent',\n        aggregate: 'ratio_percent',\n        statKey: 'roundsWon',\n        denominatorStatKey: 'roundsPlayed',\n        tooltip: 'Percentage of played rounds won'\n      },\n      {\n        key: 'roundsPlayed',\n        label: 'Rounds Played',\n        format: 'integer',\n        aggregate: 'sum',\n        statKey: 'roundsPlayed',\n        tooltip: 'Total rounds participated in'\n      }\n    ],\n\n    getDefaultConfig: function(playerCount) {\n      return {\n        targetScore: 3\n      };\n    },\n\n    validateConfig: function(config) {\n      if (!config) return;\n      var target = config.targetScore;\n      if (typeof target === 'number' && (target < 1 || target > 100)) {\n        throw new Error('Winning score must be between 1 and 100');\n      }\n    },\n\n    getSessionTitle: function(config) {\n      var target = (config && config.targetScore) || 3;\n      return 'Rock Paper Scissors (First to ' + target + ')';\n    },\n\n    createInitialState: function(playerIds, config, mode) {\n      if (mode === 'quick' && helpers && helpers.createEmptyQuickState) {\n        return helpers.createEmptyQuickState(playerIds);\n      }\n      var target = (config && config.targetScore) || 3;\n      var totals = {};\n      for (var i = 0; i < playerIds.length; i++) {\n        totals[playerIds[i]] = 0;\n      }\n      return {\n        kind: 'simple-points',\n        totals: totals,\n        targetScore: target,\n        rounds: []\n      };\n    },\n\n    addRound: function(state, roundInput, playerIds, config) {\n      var points = (roundInput && roundInput.pointsByPlayer) || {};\n      var nextTotals = Object.assign({}, state.totals);\n\n      for (var i = 0; i < playerIds.length; i++) {\n        var pid = playerIds[i];\n        var pts = Number(points[pid] || 0);\n        nextTotals[pid] = (nextTotals[pid] || 0) + pts;\n      }\n\n      var roundOutcome = (roundInput && roundInput.outcome) || 'win';\n      if (roundOutcome === 'tie') {\n        roundOutcome = 'Draw / Tie';\n      } else if (roundOutcome === 'win') {\n        roundOutcome = 'Decisive Win';\n      }\n\n      var roundEntry = {\n        roundNumber: (state.rounds ? state.rounds.length : 0) + 1,\n        points: points,\n        outcome: roundOutcome,\n        input: roundInput\n      };\n\n      return {\n        kind: 'simple-points',\n        totals: nextTotals,\n        targetScore: state.targetScore || (config && config.targetScore) || 3,\n        rounds: (state.rounds || []).concat([roundEntry])\n      };\n    },\n\n    undoLastRound: function(state, playerIds, config) {\n      if (!state.rounds || state.rounds.length === 0) return state;\n      var last = state.rounds[state.rounds.length - 1];\n      var nextTotals = Object.assign({}, state.totals);\n      var points = last.points || {};\n\n      for (var i = 0; i < playerIds.length; i++) {\n        var pid = playerIds[i];\n        nextTotals[pid] = (nextTotals[pid] || 0) - Number(points[pid] || 0);\n      }\n\n      return {\n        kind: 'simple-points',\n        totals: nextTotals,\n        targetScore: state.targetScore || (config && config.targetScore) || 3,\n        rounds: state.rounds.slice(0, -1)\n      };\n    },\n\n    editRound: function(state, roundNumber, roundInput, playerIds, config) {\n      if (!state.rounds || roundNumber < 1 || roundNumber > state.rounds.length) return state;\n      var targetIdx = roundNumber - 1;\n      var totals = {};\n      for (var p = 0; p < playerIds.length; p++) totals[playerIds[p]] = 0;\n      var nextRounds = [];\n\n      for (var i = 0; i < state.rounds.length; i++) {\n        var input = (i === targetIdx) ? roundInput : state.rounds[i].input;\n        var pts = (input && input.pointsByPlayer) || {};\n        for (var j = 0; j < playerIds.length; j++) {\n          var id = playerIds[j];\n          totals[id] = (totals[id] || 0) + Number(pts[id] || 0);\n        }\n        var outcome = (input && input.outcome) || 'win';\n        if (outcome === 'tie') outcome = 'Draw / Tie';\n        else if (outcome === 'win') outcome = 'Decisive Win';\n\n        nextRounds.push({\n          roundNumber: i + 1,\n          points: pts,\n          outcome: outcome,\n          input: input\n        });\n      }\n\n      return {\n        kind: 'simple-points',\n        totals: totals,\n        targetScore: state.targetScore,\n        rounds: nextRounds\n      };\n    },\n\n    isGameComplete: function(state, playerIds, config, mode) {\n      if (helpers && helpers.isQuickState && helpers.isQuickState(state)) return true;\n      var target = (config && config.targetScore) || state.targetScore || 3;\n      for (var i = 0; i < playerIds.length; i++) {\n        if ((state.totals[playerIds[i]] || 0) >= target) return true;\n      }\n      return false;\n    },\n\n    computeStandings: function(state, playerIds, config, mode) {\n      if (helpers && helpers.isQuickState && helpers.isQuickState(state)) {\n        return helpers.computeQuickStandings(state, playerIds);\n      }\n      var target = (config && config.targetScore) || state.targetScore || 3;\n      var entries = playerIds.map(function(pid) {\n        return {\n          playerId: pid,\n          score: state.totals[pid] || 0\n        };\n      });\n\n      if (helpers && helpers.rankEntries) {\n        return helpers.rankEntries(entries, {\n          scoringDirection: 'highest_wins',\n          unitLabel: 'pts',\n          isWinner: function(item, rank) {\n            return rank === 1 && (item.score || 0) >= target;\n          }\n        });\n      }\n\n      entries.sort(function(a, b) {\n        return b.score - a.score;\n      });\n      return entries.map(function(e, idx) {\n        return {\n          playerId: e.playerId,\n          rank: idx + 1,\n          score: e.score,\n          scoreFormatted: e.score + ' pts',\n          isWinner: idx === 0 && e.score >= target\n        };\n      });\n    },\n\n    extractPlayerStats: function(state, playerId, standing, config, mode) {\n      var isQuick = helpers && helpers.isQuickState && helpers.isQuickState(state);\n      var roundsCount = isQuick ? 0 : (state.rounds ? state.rounds.length : 0);\n      var won = isQuick ? (standing.rank === 1 ? 1 : 0) : (state.totals ? (state.totals[playerId] || 0) : 0);\n\n      return {\n        roundsWon: won,\n        roundsPlayed: roundsCount,\n        finalScore: standing ? standing.score : (state.totals ? state.totals[playerId] || 0 : 0)\n      };\n    }\n  };\n};"
+}
