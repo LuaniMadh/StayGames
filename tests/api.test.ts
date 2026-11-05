@@ -95,6 +95,19 @@ describe('API (no database required)', () => {
     expect(res.body.games[0]).not.toHaveProperty('addRound');
   });
 
+  it('protects session export endpoint', async () => {
+    const res = await request(app).get('/api/sessions/export');
+    expect(res.status).toBe(401);
+  });
+
+  it('rejects invalid import payload', async () => {
+    const res = await request(app)
+      .post('/api/sessions/import')
+      .set('Authorization', `Bearer ${token}`)
+      .send({ invalid: 'data' });
+    expect(res.status).toBe(400);
+  });
+
   it('rejects login with missing credentials', async () => {
     const res = await request(app).post('/api/auth/login').send({ username: '' });
     expect(res.status).toBe(400);

@@ -7,7 +7,9 @@ import {
   createSession,
   deleteSession,
   editSessionRound,
+  exportSessionsData,
   getSessionById,
+  importSessionsData,
   listSessions,
   undoSessionRound,
   updateSessionNotes,
@@ -31,6 +33,29 @@ sessionsRouter.get('/', async (req, res) => {
     res.json({ sessions });
   } catch (err: any) {
     res.status(500).json({ error: err?.message || 'Failed to load sessions.' });
+  }
+});
+
+sessionsRouter.get('/export', async (_req, res) => {
+  try {
+    const data = await exportSessionsData();
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="staygames-export-${new Date().toISOString().slice(0, 10)}.json"`
+    );
+    res.json(data);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to export sessions data.' });
+  }
+});
+
+sessionsRouter.post('/import', async (req, res) => {
+  try {
+    const result = await importSessionsData(req.body);
+    res.json(result);
+  } catch (err: any) {
+    res.status(400).json({ error: err?.message || 'Failed to import sessions.' });
   }
 });
 

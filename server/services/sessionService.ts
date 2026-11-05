@@ -1,4 +1,4 @@
-import { ResultSetHeader, RowDataPacket } from 'mysql2/promise';
+import { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { getGameBySlug } from '../../shared/games/index.js';
 import {
   GameMode,
@@ -10,6 +10,7 @@ import {
   StandingEntry,
 } from '../../shared/types.js';
 import { getPool } from '../db/pool.js';
+import { pickAvatarColor } from './playerService.js';
 
 function parseJsonColumn<T>(raw: unknown, fallback: T): T {
   if (raw === null || raw === undefined) return fallback;
@@ -577,4 +578,256 @@ export async function deleteSession(sessionId: number): Promise<boolean> {
     [sessionId]
   );
   return res.affectedRows > 0;
+}
+
+export interface ExportedParticipant {
+  seatOrder: number;
+  displayName: string;
+  username?: string | null;
+  ldapUid?: string | null;
+  avatarColor?: string;
+  isGuest?: boolean;
+  finalScore: number | null;
+  placement: number | null;
+  isWinner: boolean;
+  stats?: Record<string, any>;
+}
+
+export interface ExportedSessionRecord {
+  originalId?: number;
+  gameSlug: string;
+  mode: GameMode;
+  status: SessionStatus;
+  config: Record<string, any>;
+  state: Record<string, any>;
+  notes: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  participants: ExportedParticipant[];
+}
+
+export interface SessionsExportPayload {
+  version: number;
+  exportedAt: string;
+  totalSessions: number;
+  sessions: ExportedSessionRecord[];
+}
+
+export async function exportSessionsData(): Promise<SessionsExportPayload> {
+  const pool = getPool();
+  const [sessionRows] = await pool.query<RowDataPacket[]>(
+    'SELECT * FROM game_sessions ORDER BY started_at ASC, id ASC'
+  );
+
+  const [participantRows] = await pool.query<RowDataPacket[]>(
+    `SELECT
+       sp.session_id,
+       sp.seat_order,
+       sp.final_score,
+       sp.placement,
+       sp.is_winner,
+       sp.stats_json,
+       p.display_name,
+       p.username,
+       p.ldap_uid,
+       p.avatar_color,
+       p.is_guest
+     FROM session_players sp
+     JOIN players p ON sp.player_id = p.id
+     ORDER BY sp.session_id ASC, sp.seat_order ASC`
+  );
+
+  const participantsBySession = new Map<number, ExportedParticipant[]>();
+  for (const row of participantRows) {
+    const sid = Number(row.session_id);
+    if (!participantsBySession.has(sid)) {
+      participantsBySession.set(sid, []);
+    }
+    participantsBySession.get(sid)!.push({
+      seatOrder: Number(row.seat_order),
+      displayName: row.display_name,
+      username: row.username || null,
+      ldapUid: row.ldap_uid || null,
+      avatarColor: row.avatar_color,
+      isGuest: Boolean(row.is_guest),
+      finalScore: row.final_score !== null ? Number(row.final_score) : null,
+      placement: row.placement !== null ? Number(row.placement) : null,
+      isWinner: Boolean(row.is_winner),
+      stats: parseJsonColumn<Record<string, any>>(row.stats_json, {}),
+    });
+  }
+
+  const exportSessions: ExportedSessionRecord[] = sessionRows.map((r) => {
+    const sid = Number(r.id);
+    return {
+      originalId: sid,
+      gameSlug: r.game_slug,
+      mode: r.mode as GameMode,
+      status: r.status as SessionStatus,
+      config: parseJsonColumn(r.config_json, {}),
+      state: parseJsonColumn(r.state_json, {}),
+      notes: r.notes || null,
+      startedAt: new Date(r.started_at).toISOString(),
+      completedAt: r.completed_at ? new Date(r.completed_at).toISOString() : null,
+      participants: participantsBySession.get(sid) || [],
+    };
+  });
+
+  return {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    totalSessions: exportSessions.length,
+    sessions: exportSessions,
+  };
+}
+
+export async function importSessionsData(payload: unknown): Promise<{
+  importedCount: number;
+  skippedCount: number;
+  createdPlayersCount: number;
+}> {
+  if (!payload || typeof payload !== 'object') {
+    throw new Error('Invalid import file: payload must be a JSON object.');
+  }
+
+  const raw = payload as Partial<SessionsExportPayload>;
+  const sessions = raw.sessions;
+  if (!Array.isArray(sessions)) {
+    throw new Error('Invalid import format: expected a "sessions" array.');
+  }
+
+  const pool = getPool();
+  const conn = await pool.getConnection();
+
+  let importedCount = 0;
+  let skippedCount = 0;
+  let createdPlayersCount = 0;
+
+  try {
+    await conn.beginTransaction();
+
+    for (const s of sessions) {
+      if (!s.gameSlug || !s.startedAt || !Array.isArray(s.participants)) {
+        skippedCount++;
+        continue;
+      }
+
+      const mysqlStartedAt = new Date(s.startedAt)
+        .toISOString()
+        .slice(0, 19)
+        .replace('T', ' ');
+
+      // Check for exact duplicate session to avoid double importing
+      const [existing] = await conn.query<RowDataPacket[]>(
+        'SELECT id FROM game_sessions WHERE game_slug = ? AND started_at = ? LIMIT 1',
+        [s.gameSlug, mysqlStartedAt]
+      );
+      if (existing.length > 0) {
+        skippedCount++;
+        continue;
+      }
+
+      const mysqlCompletedAt = s.completedAt
+        ? new Date(s.completedAt).toISOString().slice(0, 19).replace('T', ' ')
+        : null;
+
+      // Insert game session
+      const [sessRes] = await conn.query<ResultSetHeader>(
+        `INSERT INTO game_sessions (game_slug, mode, status, config_json, state_json, notes, started_at, completed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          s.gameSlug,
+          s.mode || 'scorecard',
+          s.status || 'completed',
+          JSON.stringify(s.config || {}),
+          JSON.stringify(s.state || {}),
+          s.notes || null,
+          mysqlStartedAt,
+          mysqlCompletedAt,
+        ]
+      );
+      const sessionId = sessRes.insertId;
+
+      // Resolve each participant and insert session_players
+      for (const p of s.participants) {
+        let playerId: number | null = null;
+
+        // Try ldapUid
+        if (p.ldapUid) {
+          const [byLdap] = await conn.query<RowDataPacket[]>(
+            'SELECT id FROM players WHERE ldap_uid = ? LIMIT 1',
+            [p.ldapUid]
+          );
+          if (byLdap.length > 0) playerId = Number(byLdap[0].id);
+        }
+
+        // Try username
+        if (!playerId && p.username) {
+          const [byUser] = await conn.query<RowDataPacket[]>(
+            'SELECT id FROM players WHERE username = ? LIMIT 1',
+            [p.username]
+          );
+          if (byUser.length > 0) playerId = Number(byUser[0].id);
+        }
+
+        // Try displayName
+        if (!playerId && p.displayName) {
+          const [byName] = await conn.query<RowDataPacket[]>(
+            'SELECT id FROM players WHERE LOWER(display_name) = LOWER(?) LIMIT 1',
+            [p.displayName.trim()]
+          );
+          if (byName.length > 0) playerId = Number(byName[0].id);
+        }
+
+        // Create player if missing
+        if (!playerId) {
+          const color = p.avatarColor || pickAvatarColor(p.displayName || 'Guest');
+          const isGuest = p.isGuest !== false;
+          const [insPlayer] = await conn.query<ResultSetHeader>(
+            `INSERT INTO players (display_name, username, ldap_uid, avatar_color, is_guest, is_active)
+             VALUES (?, ?, ?, ?, ?, 1)`,
+            [
+              p.displayName || 'Guest',
+              p.username || null,
+              p.ldapUid || null,
+              color,
+              isGuest ? 1 : 0,
+            ]
+          );
+          playerId = insPlayer.insertId;
+          createdPlayersCount++;
+        }
+
+        // Insert session_player
+        await conn.query(
+          `INSERT INTO session_players (session_id, player_id, seat_order, final_score, placement, is_winner, stats_json)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            sessionId,
+            playerId,
+            p.seatOrder ?? 0,
+            p.finalScore !== undefined ? p.finalScore : null,
+            p.placement !== undefined ? p.placement : null,
+            p.isWinner ? 1 : 0,
+            JSON.stringify(p.stats || {}),
+          ]
+        );
+      }
+
+      importedCount++;
+    }
+
+    await conn.commit();
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
+  }
+
+  return {
+    importedCount,
+    skippedCount,
+    createdPlayersCount,
+  };
 }

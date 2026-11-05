@@ -370,7 +370,30 @@ module.exports = function(helpers) {
 
     computeStandings: function(state, playerIds, config, mode) {
       if (helpers && helpers.isQuickState && helpers.isQuickState(state)) {
-        return helpers.computeQuickStandings(state, playerIds);
+        var firstScore = (state.placements && state.placements[0] && state.placements[0].score != null) ? Number(state.placements[0].score) : 0;
+        var victoryTarget = (config && config.targetScore) || 25;
+        var isWin = (state.placements && state.placements[0] && state.placements[0].placement === 1) || (firstScore >= 18);
+        var badge = isWin
+          ? (firstScore >= victoryTarget ? 'Legendary! (' + firstScore + '/' + victoryTarget + ' pts)' : firstScore + '/' + victoryTarget + ' Fireworks Points')
+          : 'Fireworks Defeat (' + firstScore + ' pts)';
+
+        if (helpers && helpers.createCooperativeStandings) {
+          return helpers.createCooperativeStandings(playerIds, firstScore, {
+            isWin: isWin,
+            secondaryBadge: badge,
+            scoreFormatted: firstScore + ' pts'
+          });
+        }
+        return playerIds.map(function(pid) {
+          return {
+            playerId: pid,
+            rank: 1,
+            score: firstScore,
+            isWinner: isWin,
+            scoreFormatted: firstScore + ' pts',
+            secondaryBadge: badge
+          };
+        });
       }
 
       var maxStrikes = (config && config.maxStrikes) || state.maxStrikes || 3;

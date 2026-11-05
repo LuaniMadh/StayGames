@@ -120,6 +120,14 @@ export const api = {
   ) => request<{ session: GameSession }>('POST', `/api/sessions/${id}/complete`, body),
   deleteSession: (id: number) =>
     request<{ ok: true }>('DELETE', `/api/sessions/${id}`),
+  exportSessions: () =>
+    request<any>('GET', '/api/sessions/export'),
+  importSessions: (payload: any) =>
+    request<{ importedCount: number; skippedCount: number; createdPlayersCount: number }>(
+      'POST',
+      '/api/sessions/import',
+      payload
+    ),
 
   savePartialState: (id: number, state: unknown) =>
     request<{ session: GameSession }>('PUT', `/api/sessions/${id}/state`, { state }),

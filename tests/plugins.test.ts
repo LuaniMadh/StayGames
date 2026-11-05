@@ -190,6 +190,29 @@ describe('Plugin Compilation & Sandboxing', () => {
     expect(s4.hintHistory).toEqual([8, 8, 7, 7, 8]);
   });
 
+  it('handles cooperative quick mode results in Hanabi plugin', () => {
+    const fs = require('fs');
+    const hanabiCode = fs.readFileSync('plugins/hanabi.js', 'utf8');
+    const def = compilePluginCode(hanabiCode);
+
+    const quickVictoryState = {
+      kind: 'quick',
+      placements: [
+        { playerId: 1, placement: 1, score: 25 },
+        { playerId: 2, placement: 1, score: 25 },
+      ],
+    };
+
+    const standings = def.computeStandings(quickVictoryState as any, [1, 2], { targetScore: 25 }, 'quick');
+    expect(standings).toHaveLength(2);
+    expect(standings[0]).toMatchObject({ playerId: 1, rank: 1, isWinner: true, score: 25 });
+    expect(standings[1]).toMatchObject({ playerId: 2, rank: 1, isWinner: true, score: 25 });
+    expect(standings[0].secondaryBadge).toContain('Legendary');
+
+    const stats1 = def.extractPlayerStats(quickVictoryState as any, 1, standings[0], { targetScore: 25 }, 'quick');
+    expect(stats1).toMatchObject({ teamScore: 25, isWin: true, rating: 'Legendary (25)' });
+  });
+
   it('rejects invalid plugins missing required fields or methods', () => {
     // Missing slug
     expect(() => compilePluginCode('module.exports = { name: "No slug" };')).toThrow();
