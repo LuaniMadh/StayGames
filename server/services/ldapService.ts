@@ -253,12 +253,22 @@ export async function fetchAllLdapUsers(): Promise<LdapDirectoryUser[]> {
       attributes: getRequestedAttributes(),
     });
 
+    console.log(
+      `[LDAP] Roster sync search on base "${config.ldap.userSearchBase}" with filter "${config.ldap.syncFilter}" found ${searchEntries.length} entries.`
+    );
+
     const users: LdapDirectoryUser[] = [];
     for (const entry of searchEntries) {
       const mapped = mapEntryToUser(entry);
       if (mapped) {
         users.push(mapped);
       }
+    }
+
+    if (searchEntries.length > 0 && users.length === 0) {
+      console.warn(
+        `[LDAP] ${searchEntries.length} entries found but none mapped to users. Check LDAP_ATTR_UID (${config.ldap.attrUid}) or LDAP_ATTR_USERNAME (${config.ldap.attrUsername}). Available attributes in first entry: ${Object.keys(searchEntries[0]).join(', ')}`
+      );
     }
     return users;
   } finally {
