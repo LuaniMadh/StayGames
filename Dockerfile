@@ -22,6 +22,10 @@ RUN npm prune --omit=dev
 # Stage 2: Production runtime image
 FROM node:22-alpine AS runner
 
+LABEL org.opencontainers.image.source="https://github.com/LuaniMadh/StayGames"
+LABEL org.opencontainers.image.description="StayGames game night platform with modular scorecards and LDAP authentication"
+LABEL org.opencontainers.image.licenses="MIT"
+
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000

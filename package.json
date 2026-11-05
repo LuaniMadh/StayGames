@@ -12,7 +12,8 @@
     "build": "npm run build:client && npm run build:server",
     "start": "node dist/server/server/index.js",
     "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.server.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "publish:image": "./scripts/publish-image.sh"
   },
   "dependencies": {
     "cookie-parser": "^1.4.7",
