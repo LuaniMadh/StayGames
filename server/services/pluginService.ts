@@ -1,3 +1,5 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import vm from 'node:vm';
 import { RowDataPacket } from 'mysql2/promise';
 import {
@@ -14,6 +16,7 @@ import {
   getGameBySlug,
 } from '../../shared/games/index.js';
 import { GameDefinition, GameMetadata } from '../../shared/types.js';
+import { config } from '../config.js';
 import { getPool } from '../db/pool.js';
 
 export interface PluginRecord {
@@ -171,8 +174,20 @@ function validateGameDefinition(def: any): asserts def is GameDefinition<any, an
   def.cooperative = Boolean(def.cooperative || def.gameType === 'cooperative');
 }
 
+function ensurePluginsDir(): string {
+  const dir = config.plugins.dir;
+  if (!fs.existsSync(dir)) {
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+    } catch (err: any) {
+      console.warn(`[Plugin] Warning: could not create plugins directory "${dir}":`, err?.message || err);
+    }
+  }
+  return dir;
+}
+
 /**
- * Loads and registers all enabled plugins from the database on startup.
+ * Loads and registers all enabled plugins from the database and persistent disk volume on startup.
  */
 export async function loadInstalledPlugins(): Promise<{ loaded: number; errors: string[] }> {
   const pool = getPool();
@@ -182,17 +197,81 @@ export async function loadInstalledPlugins(): Promise<{ loaded: number; errors: 
 
   let loaded = 0;
   const errors: string[] = [];
+  const registeredSlugs = new Set<string>();
+  const dir = ensurePluginsDir();
 
+  // 1. Load from database and ensure backup on persistent disk volume
   for (const r of rows) {
     try {
-      const def = compilePluginCode(String(r.code_js));
+      const code = String(r.code_js);
+      const def = compilePluginCode(code);
       registerGame(def);
+      registeredSlugs.add(def.slug);
       loaded++;
-      console.log(`[Plugin] Successfully loaded and registered game plugin "${def.name}" (${def.slug}).`);
+      console.log(`[Plugin] Registered game plugin "${def.name}" (${def.slug}) from database.`);
+
+      // Sync to disk file if missing on the persistent volume
+      const filePath = path.join(dir, `${def.slug}.js`);
+      if (!fs.existsSync(filePath)) {
+        try {
+          fs.writeFileSync(filePath, code, 'utf8');
+        } catch {
+          // Ignore if directory is read-only
+        }
+      }
     } catch (err: any) {
-      const msg = `Failed to load plugin "${r.slug}": ${err?.message || err}`;
+      const msg = `Failed to load plugin "${r.slug}" from database: ${err?.message || err}`;
       console.error(`[Plugin] ${msg}`);
       errors.push(msg);
+    }
+  }
+
+  // 2. Discover and auto-import any plugin files from the persistent plugins directory
+  if (fs.existsSync(dir)) {
+    try {
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        if (!file.endsWith('.js') && !file.endsWith('.json')) continue;
+        const filePath = path.join(dir, file);
+        try {
+          const content = fs.readFileSync(filePath, 'utf8');
+          let codeJs = content;
+          if (file.endsWith('.json')) {
+            try {
+              const parsed = JSON.parse(content);
+              if (parsed.codeJs) codeJs = parsed.codeJs;
+            } catch {
+              continue;
+            }
+          }
+
+          const def = compilePluginCode(codeJs);
+          if (BUILT_IN_SLUGS.has(def.slug)) continue;
+
+          // If not already loaded from DB, install/persist to DB and register
+          if (!registeredSlugs.has(def.slug)) {
+            await pool.query(
+              `INSERT INTO plugins (slug, name, version, description, code_js, enabled)
+               VALUES (?, ?, '1.0.0', ?, ?, 1)
+               ON DUPLICATE KEY UPDATE
+                 name = VALUES(name),
+                 code_js = VALUES(code_js),
+                 description = VALUES(description),
+                 enabled = 1,
+                 updated_at = UTC_TIMESTAMP()`,
+              [def.slug, def.name, def.description, codeJs]
+            );
+            registerGame(def);
+            registeredSlugs.add(def.slug);
+            loaded++;
+            console.log(`[Plugin] Discovered and registered game plugin "${def.name}" (${def.slug}) from ${file}.`);
+          }
+        } catch (fileErr: any) {
+          console.warn(`[Plugin] Could not load plugin file "${file}":`, fileErr?.message || fileErr);
+        }
+      }
+    } catch (dirErr: any) {
+      console.warn(`[Plugin] Could not scan directory "${dir}":`, dirErr?.message || dirErr);
     }
   }
 
@@ -276,6 +355,15 @@ export async function installOrUpdatePlugin(input: PluginUploadInput): Promise<{
   // 3. Register live in memory immediately (no restart needed!)
   registerGame(def);
 
+  // 4. Persist to persistent plugins directory on disk
+  try {
+    const dir = ensurePluginsDir();
+    const filePath = path.join(dir, `${def.slug}.js`);
+    fs.writeFileSync(filePath, input.codeJs, 'utf8');
+  } catch (err: any) {
+    console.warn(`[Plugin] Warning: failed to persist plugin file to disk for "${def.slug}":`, err?.message || err);
+  }
+
   const saved = await getPluginBySlug(def.slug);
   if (!saved) throw new Error('Failed to load saved plugin.');
 
@@ -292,6 +380,17 @@ export async function uninstallPlugin(slug: string): Promise<boolean> {
 
   const pool = getPool();
   await pool.query('DELETE FROM plugins WHERE slug = ?', [slug]);
+
+  // Remove from persistent plugins directory on disk
+  try {
+    const dir = ensurePluginsDir();
+    const jsPath = path.join(dir, `${slug}.js`);
+    if (fs.existsSync(jsPath)) fs.unlinkSync(jsPath);
+    const jsonPath = path.join(dir, `${slug}.json`);
+    if (fs.existsSync(jsonPath)) fs.unlinkSync(jsonPath);
+  } catch (err: any) {
+    console.warn(`[Plugin] Warning: failed to remove plugin file for "${slug}":`, err?.message || err);
+  }
 
   // Unregister in live memory
   unregisterGame(slug);

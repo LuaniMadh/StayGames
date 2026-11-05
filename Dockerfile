@@ -38,6 +38,10 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./dist
 
+# Copy bundled plugins and ensure runtime write permissions for persistence
+COPY plugins ./plugins
+RUN chown -R node:node /app/plugins
+
 # Non-root user for security
 USER node
 

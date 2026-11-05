@@ -1,42 +1,47 @@
 services:
-    staygames:
-      # image: ghcr.io/luanimadh/staygames:latest
-      build:
-        context: .
-        dockerfile: Dockerfile
-      container_name: staygames-app
-      restart: unless-stopped
-      ports:
-        - 3654:3000
-      env_file: .env
-      depends_on:
-        mysql:
-          condition: service_healthy
+  staygames:
+    image: ghcr.io/luanimadh/staygames:latest
+    # To build locally from source instead of pulling from GHCR:
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    container_name: staygames-app
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file: .env
+    volumes:
+      - plugins_data:/app/plugins
+    depends_on:
+      mysql:
+        condition: service_healthy
 
-    mysql:
-      image: mysql:8.0
-      container_name: staygames-mysql
-      restart: unless-stopped
-      volumes:
-        - mysql_data:/var/lib/mysql
-      environment:
-        MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_secret}
-        MYSQL_DATABASE: ${DB_NAME:-staygames}
-        MYSQL_USER: ${DB_USER:-staygames}
-        MYSQL_PASSWORD: ${DB_PASSWORD:-staygames_secret}
-      healthcheck:
-        test:
-          - CMD
-          - mysqladmin
-          - ping
-          - -h
-          - localhost
-          - -u
-          - root
-          - -p${MYSQL_ROOT_PASSWORD:-root_secret}
-        interval: 5s
-        timeout: 5s
-        retries: 10
-        start_period: 15s
+  mysql:
+    image: mysql:8.0
+    container_name: staygames-mysql
+    restart: unless-stopped
+    volumes:
+      - mysql_data:/var/lib/mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_secret}
+      MYSQL_DATABASE: ${DB_NAME:-staygames}
+      MYSQL_USER: ${DB_USER:-staygames}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-staygames_secret}
+    healthcheck:
+      test:
+        - CMD
+        - mysqladmin
+        - ping
+        - -h
+        - localhost
+        - -u
+        - root
+        - -p${MYSQL_ROOT_PASSWORD:-root_secret}
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
 volumes:
   mysql_data: null
+  plugins_data: null

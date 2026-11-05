@@ -1,3 +1,4 @@
+import path from 'node:path';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -10,6 +11,10 @@ function parseBool(value: string | undefined, defaultVal: boolean): boolean {
 export const config = {
   port: Number(process.env.PORT || 3000),
   nodeEnv: process.env.NODE_ENV || 'development',
+
+  plugins: {
+    dir: process.env.PLUGINS_DIR || path.resolve(process.cwd(), 'plugins'),
+  },
 
   jwt: {
     secret:
