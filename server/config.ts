@@ -24,7 +24,7 @@ export const config = {
     host: process.env.DB_HOST || 'mysql',
     port: Number(process.env.DB_PORT || 3306),
     user: process.env.DB_USER || 'staygames',
-    password: process.env.DB_PASSWORD || 'staygames',
+    password: process.env.DB_PASSWORD || 'staygames_secret',
     database: process.env.DB_NAME || 'staygames',
     connectRetries: Number(process.env.DB_CONNECT_RETRIES || 20),
     connectRetryDelayMs: Number(process.env.DB_CONNECT_RETRY_DELAY_MS || 2500),
