@@ -91,15 +91,57 @@ export async function upsertLdapPlayer(
 
 export async function syncRosterFromLdap(): Promise<{
   totalSynced: number;
+  totalDeactivated: number;
+  totalDeleted: number;
   players: Player[];
 }> {
   const directoryUsers = await fetchAllLdapUsers();
+  const validUids = new Set(
+    directoryUsers.flatMap((u) => [
+      u.uid.toLowerCase(),
+      u.username.toLowerCase(),
+    ])
+  );
+
   for (const u of directoryUsers) {
     await upsertLdapPlayer(u);
   }
+
+  // Find all existing LDAP players (is_guest = 0) and prune/deactivate those
+  // that no longer match the LDAP filter
+  const pool = getPool();
+  const [existingRows] = await pool.query<RowDataPacket[]>(
+    'SELECT id, ldap_uid, username FROM players WHERE is_guest = 0'
+  );
+
+  let totalDeactivated = 0;
+  let totalDeleted = 0;
+
+  for (const row of existingRows) {
+    const uid = (row.ldap_uid || row.username || '').toLowerCase();
+    if (!validUids.has(uid)) {
+      // Check if this player has participated in any games
+      const [sessionCount] = await pool.query<RowDataPacket[]>(
+        'SELECT COUNT(*) as count FROM session_players WHERE player_id = ?',
+        [row.id]
+      );
+      if (sessionCount[0]?.count === 0) {
+        // Safe to completely delete since they have no match history
+        await pool.query('DELETE FROM players WHERE id = ?', [row.id]);
+        totalDeleted++;
+      } else {
+        // Soft-deactivate to preserve game history integrity
+        await pool.query('UPDATE players SET is_active = 0 WHERE id = ?', [row.id]);
+        totalDeactivated++;
+      }
+    }
+  }
+
   const players = await listPlayers(false);
   return {
     totalSynced: directoryUsers.length,
+    totalDeactivated,
+    totalDeleted,
     players,
   };
 }

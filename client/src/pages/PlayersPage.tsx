@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link2, RefreshCw, UserPlus, X } from 'lucide-react';
+import { Link2, RefreshCw, Trash2, UserPlus, X } from 'lucide-react';
 import type { LdapDirectoryAccount, Player } from '../../../shared/types';
 import { api } from '../api/client';
 import { Avatar } from '../components/Avatar';
@@ -28,7 +28,10 @@ export function PlayersPage() {
     setMsg(null);
     try {
       const r = await api.syncLdap();
-      setMsg({ type: 'ok', text: `Synced ${r.totalSynced} users from LDAP.` });
+      let text = `Synced ${r.totalSynced} users from LDAP.`;
+      if (r.totalDeleted) text += ` Removed ${r.totalDeleted} stale account(s).`;
+      if (r.totalDeactivated) text += ` Deactivated ${r.totalDeactivated} account(s) with match history.`;
+      setMsg({ type: 'ok', text });
       await load();
     } catch (e: any) {
       setMsg({ type: 'err', text: e.message });
@@ -51,6 +54,17 @@ export function PlayersPage() {
   const toggleActive = async (p: Player) => {
     await api.setPlayerActive(p.id, !p.isActive).catch((e) => setMsg({ type: 'err', text: e.message }));
     await load();
+  };
+
+  const deletePlayer = async (p: Player) => {
+    if (!window.confirm(`Are you sure you want to remove "${p.displayName}"?`)) return;
+    try {
+      const res = await api.deletePlayer(p.id);
+      setMsg({ type: 'ok', text: res.message });
+      await load();
+    } catch (e: any) {
+      setMsg({ type: 'err', text: e.message });
+    }
   };
 
   const openLinkModal = async (guest: Player) => {
@@ -190,9 +204,18 @@ export function PlayersPage() {
                     {p.email ? ` · ${p.email}` : ''}
                   </div>
                 </div>
-                <button className="btn-secondary px-3 py-1 text-xs" onClick={() => toggleActive(p)}>
-                  {p.isActive ? 'Hide' : 'Show'}
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button className="btn-secondary px-3 py-1 text-xs" onClick={() => toggleActive(p)}>
+                    {p.isActive ? 'Hide' : 'Show'}
+                  </button>
+                  <button
+                    className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-700/50 transition-colors"
+                    onClick={() => deletePlayer(p)}
+                    title="Remove player"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -229,7 +252,7 @@ export function PlayersPage() {
                   <div className="truncate font-medium">{p.displayName}</div>
                   <div className="truncate text-xs text-slate-500">Guest player</div>
                 </div>
-                <div className="flex gap-1.5">
+                <div className="flex items-center gap-1.5">
                   <button
                     className="btn bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 px-2.5 py-1 text-xs"
                     onClick={() => openLinkModal(p)}
@@ -239,6 +262,13 @@ export function PlayersPage() {
                   </button>
                   <button className="btn-secondary px-2.5 py-1 text-xs" onClick={() => toggleActive(p)}>
                     {p.isActive ? 'Hide' : 'Show'}
+                  </button>
+                  <button
+                    className="p-1.5 text-slate-500 hover:text-red-400 rounded-lg hover:bg-slate-700/50 transition-colors"
+                    onClick={() => deletePlayer(p)}
+                    title="Remove guest"
+                  >
+                    <Trash2 size={14} />
                   </button>
                 </div>
               </li>

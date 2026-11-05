@@ -62,7 +62,14 @@ export const api = {
       `/api/players${includeInactive ? '?includeInactive=true' : ''}`
     ),
   syncLdap: () =>
-    request<{ totalSynced: number; players: Player[] }>('POST', '/api/players/sync-ldap'),
+    request<{
+      totalSynced: number;
+      totalDeactivated?: number;
+      totalDeleted?: number;
+      players: Player[];
+    }>('POST', '/api/players/sync-ldap'),
+  deletePlayer: (id: number) =>
+    request<{ message: string }>('DELETE', `/api/players/${id}`),
   listDirectoryAccounts: () =>
     request<{ accounts: LdapDirectoryAccount[] }>('GET', '/api/players/directory-accounts'),
   linkGuestToLdap: (guestPlayerId: number, ldapUid: string) =>

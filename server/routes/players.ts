@@ -99,3 +99,23 @@ playersRouter.patch('/:id/active', async (req, res) => {
     res.status(400).json({ error: err?.message || 'Failed to update player.' });
   }
 });
+
+playersRouter.delete('/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const pool = (await import('../db/pool.js')).getPool();
+    const [sessions] = await pool.query<any[]>(
+      'SELECT COUNT(*) as cnt FROM session_players WHERE player_id = ?',
+      [id]
+    );
+    if ((sessions[0]?.cnt || 0) > 0) {
+      await updatePlayerActiveStatus(id, false);
+      res.json({ message: 'Player has match history and was deactivated instead of deleted.' });
+      return;
+    }
+    await pool.query('DELETE FROM players WHERE id = ?', [id]);
+    res.json({ message: 'Player deleted successfully.' });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message || 'Failed to delete player.' });
+  }
+});
